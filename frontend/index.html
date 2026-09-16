@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Amount Extractor (Batch)</title>
+    <!-- Fixed Google Fonts URL domains -->
+    <link rel="preconnect" href="https://googleapis.com">
+    <link rel="preconnect" href="https://gstatic.com" crossorigin>
+    <link href="https://googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --background: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #16a34a;
+            --error: #dc2626;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            background: var(--card-bg);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 20px 25px -5px rgb(0 0 0 / 0.05);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        p.subtitle {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 28px;
+        }
+
+        .drop-zone {
+            position: relative;
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 32px 20px;
+            text-align: center;
+            background: #fafafa;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 20px;
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--primary);
+            background: #f5f3ff;
+        }
+
+        .drop-zone input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .drop-zone-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .drop-zone-text {
+            font-size: 0.9rem;
+            color: var(--text-main);
+            font-weight: 500;
+        }
+
+        .drop-zone-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.15s ease, transform 0.1s ease;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button:active {
+            transform: scale(0.99);
+        }
+
+        button:disabled {
+            background-color: var(--border);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #result-wrapper {
+            margin-top: 28px;
+            display: none;
+        }
+
+        .result-title {
+            font-size: 0.80rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        /* #result {
+            padding: 16px;
+            background: #1e293b;
+            color: #f8fafc;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            border: 1px solid #334155;
+            max-height: 400px;
+        } */
+        #result {
+            overflow-x: auto;
+        }
+
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .result-table th {
+            background: #f1f5f9;
+            color: var(--text-main);
+            font-weight: 600;
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .result-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-main);
+        }
+
+        .result-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .result-table .amount {
+            font-weight: 600;
+            color: var(--success);
+        }
+
+        #result.error {
+            background: #fef2f2;
+            color: var(--error);
+            border: 1px solid #fee2e2;
+            font-family: inherit;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>OCR Amount Extractor</h2>
+        <p class="subtitle">Upload one or multiple documents to extract transactional amounts in a single batch.</p>
+        
+        <div class="drop-zone" id="dropZone">
+            <span class="drop-zone-icon">📂</span>
+            <span class="drop-zone-text" id="fileNameDisplay">Choose files or drag them here</span>
+            <span class="drop-zone-hint">Supports multiple PDF, PNG, JPG, JPEG, WEBP files</span>
+            <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple>
+        </div>
+
+        <button id="extractBtn" onclick="extractAmount()">
+            Extract Amounts
+        </button>
+
+        <div id="result-wrapper">
+            <div class="result-title" id="resultStatus">Response Data</div>
+        <div id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById("fileInput");
+        const dropZone = document.getElementById("dropZone");
+        const fileNameDisplay = document.getElementById("fileNameDisplay");
+        const extractBtn = document.getElementById("extractBtn");
+        const resultWrapper = document.getElementById("result-wrapper");
+        const resultBox = document.getElementById("result");
+        const resultStatus = document.getElementById("resultStatus");
+
+        // UI Feedback for file updates
+        fileInput.addEventListener("change", () => {
+            const fileCount = fileInput.files.length;
+            if (fileCount > 0) {
+                fileNameDisplay.textContent = fileCount === 1 
+                    ? fileInput.files[0].name 
+                    : `${fileCount} files selected`;
+                dropZone.classList.add("drag-over");
+            } else {
+                fileNameDisplay.textContent = "Choose files or drag them here";
+                dropZone.classList.remove("drag-over");
+            }
+        });
+
+        // Drag-and-drop interactions
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
+        });
+
+        function displayResults(data) {
+            // Handle common API response formats
+            const results = Array.isArray(data)
+                ? data
+                : (data.results || data.data || []);
+
+            if (!results.length) {
+                resultBox.className = "error";
+                resultBox.textContent = "No results found.";
+                return;
+            }
+
+            // Get all column names dynamically
+            const columns = [...new Set(
+                results.flatMap(row => Object.keys(row))
+            )];
+
+            let tableHTML = `
+                <table class="result-table">
+                    <thead>
+                        <tr>
+                            ${columns.map(col => `<th>${formatColumnName(col)}</th>`).join("")}
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            results.forEach(row => {
+                tableHTML += `
+                    <tr>
+                        ${columns.map(col => {
+                            const value = row[col] ?? "-";
+
+                            return `
+                                <td class="${col.toLowerCase().includes("amount") ? "amount" : ""}">
+                                    ${value}
+                                </td>
+                            `;
+                        }).join("")}
+                    </tr>
+                `;
+            });
+
+            tableHTML += `
+                    </tbody>
+                </table>
+            `;
+
+            resultBox.className = "";
+            resultBox.innerHTML = tableHTML;
+        }
+
+        function formatColumnName(column) {
+            return column
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, char => char.toUpperCase());
+        }
+
+        async function extractAmount() {
+            if (!fileInput.files.length) {
+                resultWrapper.style.display = "block";
+                resultStatus.textContent = "Notice";
+                resultBox.className = "error";
+                resultBox.textContent = "Please select or drop at least one valid file.";
+                return;
+            }
+
+            const formData = new FormData();
+            for (let i = 0; i < fileInput.files.length; i++) {
+                formData.append("files", fileInput.files[i]);
+            }
+
+            extractBtn.disabled = true;
+            extractBtn.innerHTML = `<span class="spinner"></span>Processing Batch...`;
+            resultWrapper.style.display = "none";
+
+            try {
+                const response = await fetch("http://127.0.0.1:8000/extract-amount", {
+                    method: "POST",
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || "API experienced an internal error.");
+                }
+
+                resultWrapper.style.display = "block";
+                resultStatus.textContent = "Extraction Complete";
+                resultStatus.style.color = "var(--success)";
+                resultBox.className = "";
+                // resultBox.textContent = JSON.stringify(data, null, 2);
+                displayResults(data);
+
+            } catch (error) {
+                resultWrapper.style.display = "block";
+                resultStatus.textContent = "Extraction Error";
+                resultStatus.style.color = "var(--error)";
+                resultBox.className = "error";
+                resultBox.textContent = error.message;
+            } finally {
+                extractBtn.disabled = false;
+                extractBtn.textContent = "Extract Amounts";
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+nbs/
+data/
+.ipynb_checkpoints/
+.env
+.env.*
