@@ -5,3 +5,10 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
+
+  frontend:
+    build: 
+      context: .
+      dockerfile: Docker.frontend
+    ports:
+      - "80:80"
