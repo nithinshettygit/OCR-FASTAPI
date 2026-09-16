@@ -348,8 +348,11 @@
             resultWrapper.style.display = "none";
 
             try {
-                const response = await fetch("http://127.0.0.1:8000/extract-amount", {
-                    method: "POST",
+                // const response = await fetch("http://127.0.0.1:8000/extract-amount", {
+                const response = await fetch("http://0.0.0.0:8000/extract-amount", {
+    
+                method: "POST",
+
                     body: formData
                 });
                 
