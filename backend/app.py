@@ -10,7 +10,7 @@ logger = logging.getLogger("uvicorn.error")
 # 1. Initialize the app instance ONCE
 app = FastAPI()
 
-# 2. Add CORS middleware safely
+# 2. Add CORS middleware 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
