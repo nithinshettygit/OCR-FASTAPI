@@ -1,12 +1,58 @@
-name: Deploy OCR API to EC2
+name: OCR API CI/CD
 
 on:
+  pull_request:
+    branches:
+      - main
+
   push:
     branches:
       - main
 
 jobs:
+  test:
+    name: Test Application
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Validate Python files
+        run: |
+          python -m py_compile backend/app.py
+          python -m py_compile backend/amount_extraction_engine.py
+
+  docker-build:
+    name: Validate Docker Build
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build API Docker image
+        run: |
+          docker build -t ocr-fastapi-api:test .
+
+      - name: Build Frontend Docker image
+        run: |
+          docker build -f Docker.frontend -t ocr-fastapi-frontend:test .
+
   deploy:
+    name: Deploy to EC2
+    needs: docker-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
@@ -16,8 +62,40 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+
           script: |
+            set -e
+
             cd ~/OCR-FASTAPI
-            git pull origin main
+
+            echo "Saving current version..."
+            OLD_COMMIT=$(git rev-parse HEAD)
+
+            echo "Pulling latest code..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "Building and starting containers..."
             docker compose up -d --build
+
+            echo "Waiting for API..."
+            sleep 10
+
+            echo "Running health check..."
+            if curl -f http://localhost:8000/health; then
+                echo "API health check PASSED"
+            else
+                echo "API health check FAILED"
+                
+                echo "Rolling back..."
+                git reset --hard "$OLD_COMMIT"
+
+                docker compose up -d --build
+
+                echo "Rollback completed"
+                exit 1
+            fi
+
+            echo "Deployment successful"
+
             docker image prune -f
